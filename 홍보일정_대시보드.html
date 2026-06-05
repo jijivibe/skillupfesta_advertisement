@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026 일잘러 페스타 | 홍보 일정 대시보드</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #f0f4f8; color: #1e293b; }
+
+  .header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+    color: white; padding: 20px 28px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+  .header-left h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  .header-left p { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+  .header-btn {
+    background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35);
+    color: white; padding: 8px 16px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 600; transition: background 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .header-btn:hover { background: rgba(255,255,255,0.28); }
+
+  .month-tabs {
+    display: flex; gap: 8px;
+    padding: 16px 28px 0;
+    background: white;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .month-tab {
+    padding: 8px 20px; border-radius: 8px 8px 0 0;
+    cursor: pointer; font-size: 14px; font-weight: 600;
+    color: #64748b; background: #f1f5f9;
+    border: 1px solid #e2e8f0; border-bottom: none;
+    transition: all 0.15s;
+  }
+  .month-tab:hover { background: #e0e7ff; color: #3730a3; }
+  .month-tab.active { background: white; color: #1d4ed8; border-color: #c7d2fe; border-bottom-color: white; margin-bottom: -1px; z-index: 1; }
+
+  .main { padding: 20px 28px; }
+
+  .stats-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .stat-card {
+    background: white; border-radius: 10px; padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;
+    flex: 1; min-width: 120px;
+  }
+  .stat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .stat-label { font-size: 12px; color: #64748b; }
+  .stat-count { font-size: 18px; font-weight: 700; color: #1e293b; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .legend-item {
+    display: flex; align-items: center; gap: 5px; font-size: 11px; color: #475569;
+    cursor: pointer; padding: 3px 8px; border-radius: 20px;
+    border: 1px solid #e2e8f0; background: white; transition: all 0.15s;
+  }
+  .legend-item:hover { border-color: #94a3b8; }
+  .legend-item.active-filter { border-color: #2563eb; background: #eff6ff; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .calendar-wrap { background: white; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; overflow: hidden; }
+  .calendar-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  .cal-day-header { text-align: center; padding: 10px 4px; font-size: 12px; font-weight: 600; color: #64748b; }
+  .cal-day-header.sun { color: #ef4444; }
+  .cal-day-header.sat { color: #3b82f6; }
+
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cal-cell {
+    min-height: 110px; padding: 6px 4px 4px; border-right: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9;
+    vertical-align: top; position: relative;
+  }
+  .cal-cell:nth-child(7n) { border-right: none; }
+  .cal-cell.empty { background: #fafafa; }
+  .cal-cell.today { background: #eff6ff; }
+  .cal-cell.today .day-num { background: #2563eb; color: white; border-radius: 50%; }
+
+  .day-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+  .day-num { font-size: 12px; font-weight: 600; color: #374151; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sun-cell .day-num { color: #ef4444; }
+  .sat-cell .day-num { color: #3b82f6; }
+
+  .add-btn {
+    width: 18px; height: 18px; border-radius: 50%; background: #e2e8f0;
+    border: none; cursor: pointer; font-size: 13px; color: #64748b;
+    display: none; align-items: center; justify-content: center;
+    line-height: 1; transition: background 0.1s;
+    flex-shrink: 0;
+  }
+  .cal-cell:hover .add-btn { display: flex; }
+  .add-btn:hover { background: #2563eb; color: white; }
+
+  .event-tag {
+    display: flex; align-items: center; width: 100%; margin-bottom: 2px;
+    border-radius: 4px; font-size: 10px; font-weight: 500; line-height: 1.3;
+    cursor: pointer; transition: opacity 0.1s; text-align: left;
+    border: none; color: white; position: relative; overflow: hidden;
+  }
+  .event-tag-text {
+    flex: 1; padding: 2px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .event-tag:hover { opacity: 0.85; }
+  .event-tag .del-btn {
+    display: none; width: 16px; height: 100%; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.2); font-size: 11px; flex-shrink: 0; cursor: pointer;
+    border: none; color: white; padding: 0;
+  }
+  .event-tag:hover .del-btn { display: flex; }
+  .event-tag.custom-event { outline: 1px dashed rgba(255,255,255,0.5); outline-offset: -1px; }
+
+  .more-tag { font-size: 10px; color: #94a3b8; padding: 1px 4px; cursor: pointer; }
+  .more-tag:hover { color: #64748b; }
+
+  /* Detail Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: white; border-radius: 16px; padding: 24px; max-width: 460px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: 85vh; overflow-y: auto; }
+  .modal-date { font-size: 13px; color: #64748b; margin-bottom: 4px; }
+  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; color: #1e293b; }
+  .modal-events { display: flex; flex-direction: column; gap: 8px; }
+  .modal-event { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 8px; background: #f8fafc; position: relative; }
+  .modal-event.custom-modal-event { background: #fefce8; border: 1px dashed #fbbf24; }
+  .modal-event-cat { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 12px; color: white; white-space: nowrap; flex-shrink: 0; margin-top: 1px; }
+  .modal-event-content { font-size: 13px; color: #374151; line-height: 1.5; flex: 1; }
+  .modal-event-del { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 16px; padding: 0 4px; flex-shrink: 0; }
+  .modal-event-del:hover { color: #ef4444; }
+  .modal-close { margin-top: 16px; width: 100%; padding: 10px; background: #f1f5f9; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; color: #475569; font-weight: 500; }
+  .modal-close:hover { background: #e2e8f0; }
+
+  /* Add Event Modal */
+  .add-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; align-items: center; justify-content: center; }
+  .add-modal-overlay.open { display: flex; }
+  .add-modal { background: white; border-radius: 16px; padding: 28px; max-width: 420px; width: 92%; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .add-modal h2 { font-size: 17px; font-weight: 700; margin-bottom: 20px; color: #1e293b; display: flex; align-items: center; gap: 8px; }
+  .form-row { margin-bottom: 14px; }
+  .form-row label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px; }
+  .form-row input, .form-row select, .form-row textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+    font-size: 14px; color: #1e293b; background: #f8fafc; font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+    outline: none; border-color: #2563eb; background: white;
+  }
+  .form-row textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+  .form-row .date-row { display: flex; gap: 8px; }
+  .form-row .date-row select, .form-row .date-row input { flex: 1; }
+  .form-actions { display: flex; gap: 8px; margin-top: 20px; }
+  .btn-primary { flex: 1; padding: 11px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-cancel { padding: 11px 20px; background: #f1f5f9; color: #475569; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; }
+  .btn-cancel:hover { background: #e2e8f0; }
+
+  .custom-badge { font-size: 9px; background: #fbbf24; color: #78350f; padding: 1px 5px; border-radius: 10px; font-weight: 600; margin-left: 4px; }
+
+  /* 담당자별 뷰 */
+  .person-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .person-pill {
+    padding: 7px 16px; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 600;
+    border: 2px solid #e2e8f0; color: #64748b; background: white; transition: all 0.15s;
+  }
+  .person-pill:hover { border-color: #94a3b8; color: #374151; }
+  .person-pill.active { background: #1e3a5f; color: white; border-color: #1e3a5f; }
+
+  .assignee-view { display: none; }
+  .assignee-view.visible { display: block; }
+
+  .month-section { margin-bottom: 24px; }
+  .month-section-title {
+    font-size: 13px; font-weight: 700; color: #64748b; letter-spacing: 0.5px;
+    padding: 6px 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .month-section-title span { font-size: 11px; background: #f1f5f9; color: #94a3b8; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+
+  .task-row {
+    display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px;
+    background: white; border-radius: 8px; margin-bottom: 6px;
+    border: 1px solid #e2e8f0; transition: box-shadow 0.1s;
+  }
+  .task-row:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .task-row.custom-row { border-left: 3px solid #fbbf24; }
+  .task-date { font-size: 12px; font-weight: 700; color: #1e293b; min-width: 48px; padding-top: 1px; }
+  .task-date-dow { font-size: 10px; color: #94a3b8; font-weight: 500; }
+  .task-cat-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; color: white; white-space: nowrap; flex-shrink: 0; margin-top: 1px; }
+  .task-content { font-size: 13px; color: #374151; line-height: 1.5; flex: 1; }
+  .task-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
+  .task-meta-tag { font-size: 10px; padding: 1px 6px; border-radius: 8px; }
+  .task-meta-designer { background: #ede9fe; color: #6d28d9; }
+  .task-meta-custom { background: #fef9c3; color: #92400e; }
+
+  .no-tasks { text-align: center; padding: 40px 20px; color: #94a3b8; font-size: 14px; }
+
+  /* 진행상태 */
+  .status-select {
+    font-size: 11px; padding: 4px 8px; border-radius: 6px;
+    border: 1px solid #e2e8f0; background: white; color: #374151;
+    cursor: pointer; font-family: inherit; flex-shrink: 0;
+    transition: border-color 0.15s;
+  }
+  .status-select:focus { outline: none; border-color: #2563eb; }
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px;
+    white-space: nowrap;
+  }
+  .status-dot-tag {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.5);
+  }
+  .modal-event-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .modal-sub-items { display: flex; flex-direction: column; gap: 8px; }
+  .modal-sub-item {
+    background: #f8fafc; border-radius: 8px; padding: 10px 12px;
+    border-left: 3px solid #e2e8f0;
+  }
+  .modal-sub-text { font-size: 13px; color: #1e293b; line-height: 1.5; margin-bottom: 8px; }
+  .modal-sub-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .modal-sub-control { display: flex; align-items: center; gap: 6px; }
+  .modal-sub-control label { font-size: 11px; color: #94a3b8; white-space: nowrap; font-weight: 500; }
+  .modal-event-status { margin-top: 8px; display: flex; align-items: center; gap: 8px; }
+  .modal-event-status label { font-size: 11px; color: #94a3b8; white-space: nowrap; }
+  .task-row { align-items: center; }
+  .task-status-wrap { flex-shrink: 0; }
+  .person-summary-cards { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+  .person-card {
+    flex: 1; min-width: 130px; background: white; border-radius: 10px;
+    padding: 12px 16px; border: 1px solid #e2e8f0; cursor: pointer; transition: all 0.15s;
+    text-align: center;
+  }
+  .person-card:hover { border-color: #93c5fd; box-shadow: 0 2px 8px rgba(37,99,235,0.08); }
+  .person-card.active { border-color: #2563eb; background: #eff6ff; }
+  .person-card-name { font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+  .person-card-count { font-size: 20px; font-weight: 700; color: #2563eb; }
+  .person-card-label { font-size: 10px; color: #94a3b8; margin-top: 1px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>🎪 2026 일잘러 페스타 | 홍보 일정 대시보드</h1>
+    <p>4월 ~ 7월 월별 홍보 일정 한눈에 보기</p>
+  </div>
+  <button class="header-btn" onclick="openAddModal()">＋ 일정 추가</button>
+</div>
+
+<div class="month-tabs" id="monthTabs">
+  <div class="month-tab active" data-month="4" onclick="switchMonth(4)">4월</div>
+  <div class="month-tab" data-month="5" onclick="switchMonth(5)">5월</div>
+  <div class="month-tab" data-month="6" onclick="switchMonth(6)">6월</div>
+  <div class="month-tab" data-month="7" onclick="switchMonth(7)">7월</div>
+  <div class="month-tab tab-divider" style="margin-left:auto;" data-view="assignee" onclick="switchView('assignee')">👤 담당자별</div>
+</div>
+
+<div class="main">
+  <!-- 캘린더 뷰 -->
+  <div id="calendarView">
+    <div class="legend" id="legend"></div>
+    <div class="stats-bar" id="statsBar"></div>
+    <div class="calendar-wrap">
+      <div class="calendar-header">
+        <div class="cal-day-header sun">일</div>
+        <div class="cal-day-header">월</div>
+        <div class="cal-day-header">화</div>
+        <div class="cal-day-header">수</div>
+        <div class="cal-day-header">목</div>
+        <div class="cal-day-header">금</div>
+        <div class="cal-day-header sat">토</div>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+    </div>
+  </div>
+
+  <!-- 담당자별 뷰 -->
+  <div id="assigneeView" class="assignee-view">
+    <div class="person-summary-cards" id="personSummaryCards"></div>
+    <div class="person-pills" id="personPills"></div>
+    <div id="assigneeTaskList"></div>
+  </div>
+</div>
+
+<!-- 상세 보기 모달 -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeDetailModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-date" id="modalDate"></div>
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-events" id="modalEvents"></div>
+    <button class="modal-close" onclick="closeDetailModal()">닫기</button>
+  </div>
+</div>
+
+<!-- 일정 추가 모달 -->
+<div class="add-modal-overlay" id="addModalOverlay" onclick="closeAddModalOutside(event)">
+  <div class="add-modal">
+    <h2>📝 일정 추가</h2>
+    <div class="form-row">
+      <label>날짜 <span style="color:#ef4444">*</span></label>
+      <div class="date-row">
+        <select id="formMonth">
+          <option value="4">4월</option>
+          <option value="5">5월</option>
+          <option value="6">6월</option>
+          <option value="7">7월</option>
+        </select>
+        <input type="number" id="formDay" min="1" max="31" placeholder="일 (숫자)">
+      </div>
+    </div>
+    <div class="form-row">
+      <label>채널/카테고리</label>
+      <select id="formCategory" onchange="onCatChange()">
+        <option value="">선택하세요</option>
+        <optgroup label="내부 채널">
+          <option>내부-온라인</option>
+          <option>내부-오프라인</option>
+          <option>블로그</option>
+          <option>링크드인</option>
+          <option>인스타그램</option>
+          <option>뉴스레터</option>
+        </optgroup>
+        <optgroup label="외부 채널">
+          <option>외부-온라인</option>
+          <option>외부-오프라인</option>
+          <option>전자신문</option>
+          <option>보도자료/미디어</option>
+          <option>g벨리광고</option>
+        </optgroup>
+        <optgroup label="기타">
+          <option>앰배서더</option>
+          <option>디자인</option>
+          <option value="__custom__">직접 입력</option>
+        </optgroup>
+      </select>
+      <input type="text" id="formCategoryCustom" placeholder="카테고리 직접 입력" style="display:none; margin-top:6px;">
+    </div>
+    <div class="form-row">
+      <label>담당자 <span style="color:#ef4444">*</span></label>
+      <select id="formAssignee">
+        <option value="">선택하세요</option>
+        <option>김현정</option>
+        <option>김예지</option>
+        <option>김다예</option>
+        <option>이소현</option>
+        <option>이유정</option>
+        <option>김희종</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>디자인 주체 <span style="font-size:11px;color:#94a3b8;font-weight:400">(선택)</span></label>
+      <select id="formDesigner">
+        <option value="">해당 없음</option>
+        <option>김희종</option>
+        <option>플로우</option>
+        <option>태성</option>
+        <option>스튜디오툴툴</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>일정 내용 <span style="color:#ef4444">*</span></label>
+      <textarea id="formContent" placeholder="일정 내용을 입력하세요"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" onclick="closeAddModal()">취소</button>
+      <button class="btn-primary" onclick="saveNewEvent()">추가하기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE_EVENTS = [{"month":4,"day":3,"category":"뉴스레터","content":"산업레이더"},{"month":4,"day":1,"category":"인스타그램","content":"릴스 - 정부정책"},{"month":4,"day":3,"category":"인스타그램","content":"카드뉴스-산업레이더"},{"month":4,"day":1,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":2,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":3,"category":"블로그","content":"카드뉴스-산업레이더"},{"month":4,"day":1,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":2,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":3,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":9,"category":"전자신문","content":"뉴스레터"},{"month":4,"day":7,"category":"뉴스레터","content":"공지사항"},{"month":4,"day":10,"category":"뉴스레터","content":"산업레이더"},{"month":4,"day":6,"category":"인스타그램","content":"릴스 - 정부정책"},{"month":4,"day":8,"category":"인스타그램","content":"카드뉴스 - 트렌드"},{"month":4,"day":10,"category":"인스타그램","content":"카드뉴스-산업레이더"},{"month":4,"day":6,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":7,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":8,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":9,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":10,"category":"블로그","content":"카드뉴스-산업레이더"},{"month":4,"day":6,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":7,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":8,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":9,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":10,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":17,"category":"전자신문","content":"신문5단광고(일정변경)"},{"month":4,"day":17,"category":"뉴스레터","content":"산업레이더"},{"month":4,"day":13,"category":"인스타그램","content":"릴스 - 정부정책"},{"month":4,"day":15,"category":"인스타그램","content":"카드뉴스 - 트렌드"},{"month":4,"day":17,"category":"인스타그램","content":"카드뉴스-산업레이더"},{"month":4,"day":13,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":14,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":15,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":16,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":17,"category":"블로그","content":"카드뉴스-산업레이더"},{"month":4,"day":13,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":14,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":15,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":16,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":17,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":23,"category":"전자신문","content":"뉴스레터(수정)"},{"month":4,"day":24,"category":"뉴스레터","content":"산업레이더"},{"month":4,"day":20,"category":"인스타그램","content":"릴스 - 정부정책"},{"month":4,"day":22,"category":"인스타그램","content":"카드뉴스 - 트렌드"},{"month":4,"day":24,"category":"인스타그램","content":"카드뉴스-산업레이더"},{"month":4,"day":20,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":21,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":22,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":23,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":24,"category":"블로그","content":"카드뉴스-산업레이더"},{"month":4,"day":20,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":21,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":22,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":23,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":24,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":28,"category":"전자신문","content":"신문5단광고"},{"month":4,"day":28,"category":"뉴스레터","content":"공지사항"},{"month":4,"day":27,"category":"인스타그램","content":"릴스 - 정부정책"},{"month":4,"day":29,"category":"인스타그램","content":"카드뉴스 - 트렌드"},{"month":4,"day":27,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":28,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":29,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":30,"category":"블로그","content":"자동화 콘텐츠"},{"month":4,"day":27,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":28,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":29,"category":"링크드인","content":"자동화 콘텐츠"},{"month":4,"day":30,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":8,"category":"뉴스레터","content":"산업레이더(날짜변경)"},{"month":5,"day":6,"category":"인스타그램","content":"카드뉴스 - 트렌드"},{"month":5,"day":8,"category":"인스타그램","content":"카드뉴스-산업레이더"},{"month":5,"day":6,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":7,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":8,"category":"블로그","content":"카드뉴스-산업레이더"},{"month":5,"day":6,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":7,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":8,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":15,"category":"앰배서더","content":"가이드라인 발송"},{"month":5,"day":12,"category":"전자신문","content":"뉴스레터"},{"month":5,"day":14,"category":"전자신문","content":"신문5단광고(내용변경)"},{"month":5,"day":15,"category":"뉴스레터","content":"공지사항(날짜변경)"},{"month":5,"day":11,"category":"인스타그램","content":"릴스 - 정부정책"},{"month":5,"day":13,"category":"인스타그램","content":"카드뉴스 - 트렌드"},{"month":5,"day":15,"category":"인스타그램","content":"카드뉴스-산업레이더"},{"month":5,"day":11,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":12,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":13,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":14,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":15,"category":"블로그","content":"카드뉴스-산업레이더"},{"month":5,"day":11,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":12,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":13,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":14,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":15,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":18,"category":"g벨리광고","content":"레이아웃 정리 및 전달"},{"month":5,"day":21,"category":"g벨리광고","content":"시안 내부보고"},{"month":5,"day":20,"category":"앰배서더","content":"신청서 및 소개자료 제출확인"},{"month":5,"day":22,"category":"보도자료","content":"보도자료 발행(날짜변경)"},{"month":5,"day":22,"category":"뉴스레터","content":"산업레이더"},{"month":5,"day":18,"category":"인스타그램","content":"릴스 - 정부정책"},{"month":5,"day":20,"category":"인스타그램","content":"카드뉴스 - 트렌드"},{"month":5,"day":22,"category":"인스타그램","content":"카드뉴스-산업레이더"},{"month":5,"day":18,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":19,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":20,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":21,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":22,"category":"블로그","content":"카드뉴스-산업레이더"},{"month":5,"day":18,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":19,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":20,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":21,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":22,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":27,"category":"g벨리광고","content":"시안 내부 최종보고"},{"month":5,"day":29,"category":"g벨리광고","content":"최종시안 발송 / *12시 이전까지 발송요청"},{"month":5,"day":27,"category":"전자신문","content":"뉴스레터"},{"month":5,"day":26,"category":"뉴스레터","content":"공지사항(날짜변경)"},{"month":5,"day":29,"category":"뉴스레터","content":"산업레이더"},{"month":5,"day":29,"category":"인스타그램","content":"카드뉴스-산업레이더"},{"month":5,"day":26,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":27,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":28,"category":"블로그","content":"자동화 콘텐츠"},{"month":5,"day":29,"category":"블로그","content":"카드뉴스-산업레이더"},{"month":5,"day":26,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":27,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":28,"category":"링크드인","content":"자동화 콘텐츠"},{"month":5,"day":29,"category":"링크드인","content":"자동화 콘텐츠"},{"month":6,"day":1,"category":"외부-온라인","content":"- 한국기술교육대학교 뉴스레터 발행 / - 블루핀, 지란지교소프트, 가인지 배너광고 요청"},{"month":6,"day":2,"category":"외부-온라인","content":"- KT&G 상상플래닛 & 오렌지 플래닛 포스터 전달"},{"month":6,"day":2,"category":"외부-오프라인","content":"- 협단체 대상 홍보 협조 요청"},{"month":6,"day":1,"category":"내부-온라인","content":"- 블로그/링크드인 업로드"},{"month":6,"day":2,"category":"내부-온라인","content":"- 스티비 뉴스레터 (공지사항) / - 블로그/링크드인 업로드 / - 커뮤니티 내 홍보글 업로드 시작"},{"month":6,"day":1,"category":"내부-오프라인","content":"- 초청장, 포스터 배포 리스트 정리 / - 초청장, 포스터 배포 견적 및 일정 확인"},{"month":6,"day":1,"category":"앰배서더","content":"- 앰배서더 사전콘텐츠 제작 2분 도서 발송 (연로로/혜날)"},{"month":6,"day":1,"category":"디자인","content":"- 최종 포스터"},{"month":6,"day":2,"category":"디자인","content":"- 스티비 뉴스레터 헤더 작업 / - 전자신문 뉴스레터 시안 초안 제작"},{"month":6,"day":9,"category":"보도자료/미디어","content":"- 디지틀조선일보 보도자료 및 게시글 문안 전달"},{"month":6,"day":12,"category":"보도자료/미디어","content":"- 뉴스와이어 보도자료 등록 / 전자신문 신문5단광고 전달"},{"month":6,"day":8,"category":"외부-온라인","content":"- 주말토리 뉴스레터 URL 전달 / - 풋풋레터 콘텐츠 소스 전달"},{"month":6,"day":9,"category":"외부-온라인","content":"- 전자신문 뉴스레터 전달"},{"month":6,"day":11,"category":"외부-온라인","content":"- 전자신문 뉴스레터 발행"},{"month":6,"day":12,"category":"외부-온라인","content":"- 주말토리 뉴스레터 (캘린더 - URL) 발행"},{"month":6,"day":8,"category":"외부-오프라인","content":"- G벨리 송출시작일"},{"month":6,"day":11,"category":"외부-오프라인","content":"- 육교 현수막 발주 / - 코엑스마곡 미디어게이트 초안 확인"},{"month":6,"day":8,"category":"내부-온라인","content":"- 인스타그램(정부정책 릴스) / - 블로그/링크드인 업로드 / - 커뮤니티 홍보글 1차 완료"},{"month":6,"day":9,"category":"내부-온라인","content":"- 스티비 뉴스레터(공지사항) / - 인스타그램(참가기업 소개) / - 블로그/링크드인 업로드"},{"month":6,"day":10,"category":"내부-온라인","content":"- 인스타그램(참가기업 소개) / - 블로그/링크드인 업로드"},{"month":6,"day":11,"category":"내부-온라인","content":"- 인스타그램(참가기업 소개) / - 블로그/링크드인 업로드 / - 서울팝업야외도서관 카드뉴스 디자인"},{"month":6,"day":12,"category":"내부-온라인","content":"- 스티비 뉴스레터 (산업레이더) / - 블로그/인스타그램 / - 링크드인 업로드"},{"month":6,"day":12,"category":"내부-오프라인","content":"- 초청장, 포스터 우편발송"},{"month":6,"day":8,"category":"앰배서더","content":"- 사전콘텐츠 보고일 (선택사항)"},{"month":6,"day":12,"category":"앰배서더","content":"- 사전콘텐츠 업로드 시작 (선택사항)"},{"month":6,"day":8,"category":"디자인","content":"- G밸리 시안 수정 / - 육교 현수막 제작 / - 초청장 배포 시안 준비"},{"month":6,"day":9,"category":"디자인","content":"- 포터블엑스 현수막 시안 제작"},{"month":6,"day":10,"category":"디자인","content":"- G밸리 수정시안 전달 / - 전자신문 5단광고 초안 제작"},{"month":6,"day":11,"category":"디자인","content":"- 육교 현수막 시안 완성"},{"month":6,"day":12,"category":"디자인","content":"- 전자신문 5단광고 시안 마감 및 발송"},{"month":6,"day":16,"category":"보도자료/미디어","content":"- 뉴스와이어 보도자료 발행 / - 디지틀조선일보 보도자료 발행"},{"month":6,"day":16,"category":"외부-온라인","content":"- 디지틀조선일보 C&M 유튜브채널 업로드 / - 조은언니 유튜브 채널 문안 전달 / - 모비인사이드 보도자료 전달"},{"month":6,"day":19,"category":"외부-온라인","content":"- 주말토리 뉴스레터 (캘린더 - URL) 발행 / - 주말토리 콘텐츠 소재 전달"},{"month":6,"day":15,"category":"외부-오프라인","content":"- 코엑스마곡 미디어게이트 초안 전달"},{"month":6,"day":17,"category":"외부-오프라인","content":"- 포터블엑스 시안 전달"},{"month":6,"day":16,"category":"내부-온라인","content":"- 스티비 뉴스레터 (공지사항) / - 인스타그램(참가기업 소개) / - 블로그/링크드인"},{"month":6,"day":17,"category":"내부-온라인","content":"- 인스타그램(참가기업 소개) / - 블로그/링크드인 업로드 / - 서울팝업야외도서관 카드뉴스 게시"},{"month":6,"day":18,"category":"내부-온라인","content":"- 인스타그램(참가기업 소개) / - 블로그/링크드인 업로드"},{"month":6,"day":19,"category":"내부-온라인","content":"- 스티비 뉴스레터 (산업레이더) / - 인스타그램(사전등록 마감 D-7) / - 블로그/링크드인 업로드"},{"month":6,"day":15,"category":"내부-오프라인","content":"- 마곡 행정게시대 신청 (예지대리)"},{"month":6,"day":16,"category":"앰배서더","content":"- 혜날의 생산성 라이프 업로드 확인"},{"month":6,"day":18,"category":"앰배서더","content":"- 태다린 업로드 확인"},{"month":6,"day":16,"category":"디자인","content":"- 전자신문 뉴스레터 초안 제작"},{"month":6,"day":17,"category":"디자인","content":"- 전단지 시안 제작"},{"month":6,"day":19,"category":"디자인","content":"- 전자신문 뉴스레터 시안 마감 / - 전단지 시안 완성"},{"month":6,"day":22,"category":"외부-온라인","content":"- 풋풋레터 인스타그램 이벤트(~26일) / - 풋풋레터 뉴스레터 발행 / - 캐릿 인스타그램 발행"},{"month":6,"day":23,"category":"외부-온라인","content":"- 조은언니 유튜브 채널 게시판 / - 전자신문 뉴스레터 전달 / - 캐릿 뉴스레터 발행"},{"month":6,"day":24,"category":"외부-온라인","content":"- 모비인사이드 뉴스레터 배너 전달"},{"month":6,"day":25,"category":"외부-온라인","content":"- 전자신문 뉴스레터 발행"},{"month":6,"day":26,"category":"외부-온라인","content":"- 주말토리 뉴스레터 (기획기사) 발행"},{"month":6,"day":22,"category":"외부-오프라인","content":"- 코엑스마곡 미디어게이트 최종 시안 전달"},{"month":6,"day":22,"category":"내부-온라인","content":"- 인스타그램(참가기업 소개) / - 블로그/링크드인 / - 커뮤니티 홍보글 2차 시작"},{"month":6,"day":23,"category":"내부-온라인","content":"- 인스타그램(참가기업 소개) / - 블로그/링크드인 업로드"},{"month":6,"day":24,"category":"내부-온라인","content":"- 인스타그램(참가기업 소개) / - 블로그/링크드인 업로드"},{"month":6,"day":25,"category":"내부-온라인","content":"- 인스타그램(사전등록 마감 D-1) / - 블로그/링크드인 업로드"},{"month":6,"day":26,"category":"내부-온라인","content":"- 스티비 뉴스레터 (산업레이더) / - 인스타그램(사전등록 D-DAY) / - 블로그/링크드인 / - 커뮤니티 2차 완료"},{"month":6,"day":22,"category":"내부-오프라인","content":"- 마곡 가로등 현수기 게첨 (~7.5)"},{"month":6,"day":23,"category":"내부-오프라인","content":"- 전단지 발주"},{"month":6,"day":22,"category":"앰배서더","content":"- 행사 방문 예정일 확인 및 컨퍼런스 참가 여부 문의"},{"month":6,"day":26,"category":"앰배서더","content":"- 사전콘텐츠 업로드 마감 (선택사항)"},{"month":6,"day":29,"category":"내부-온라인","content":"- 인스타그램(현장이벤트/프로그램 소개) / - 블로그/링크드인 업로드"},{"month":6,"day":30,"category":"내부-온라인","content":"- 인스타그램(현장이벤트/프로그램 소개) / - 블로그/링크드인 업로드"},{"month":6,"day":30,"category":"내부-오프라인","content":"- 전단지 배포 (~7.2)"},{"month":7,"day":1,"category":"내부-온라인","content":"- 인스타그램(현장이벤트/프로그램 소개) / - 블로그/링크드인 업로드"},{"month":7,"day":2,"category":"앰배서더","content":"- 현장 콘텐츠 업로드 확인 (필수사항)"},{"month":7,"day":3,"category":"앰배서더","content":"- 현장 콘텐츠 업로드 확인 (필수사항)"},{"month":7,"day":4,"category":"앰배서더","content":"- 현장 콘텐츠 업로드 확인 (필수사항)"},{"month":7,"day":4,"category":"외부-오프라인","content":"- 협단체 대상 홍보 협조 배포"},{"month":7,"day":5,"category":"외부-오프라인","content":"- 가로등 현수기 신청 / - 코엑스마곡 미디어게이트 문안 작성"},{"month":7,"day":4,"category":"내부-온라인","content":"- 블로그/링크드인 업로드"},{"month":7,"day":5,"category":"내부-온라인","content":"- 스티비 뉴스레터 (산업레이더) / - 블로그/인스타그램 (산업레이더) / - 링크드인 업로드"},{"month":7,"day":4,"category":"디자인","content":"- 가로등 현수기 시안 완성"},{"month":7,"day":5,"category":"디자인","content":"- 전자신문 뉴스레터 시안 마감"},{"month":7,"day":5,"category":"외부-온라인","content":"- 한국기술교육대학교 게시글 문안 전달 / - 전자신문 뉴스레터 이미지 전달"}];
+
+const CATEGORY_COLORS = {
+  '블로그':'#0284c7','링크드인':'#1d4ed8','인스타그램':'#a855f7',
+  '뉴스레터':'#0891b2','전자신문':'#475569',
+  '보도자료':'#dc2626','보도자료/미디어':'#dc2626',
+  '내부-온라인':'#16a34a','외부-온라인':'#ea580c',
+  '내부-오프라인':'#65a30d','외부-오프라인':'#b45309',
+  '앰배서더':'#db2777','디자인':'#ca8a04','g벨리광고':'#7c3aed',
+  '내부-기타':'#64748b',
+};
+const MONTH_START_DAYS = {4:3,5:5,6:1,7:3};
+const MONTH_DAYS = {4:30,5:31,6:30,7:31};
+const STORAGE_KEY = 'iljalleo_custom_events_2026';
+
+let currentMonth = 4;
+let activeFilter = null;
+let customEvents = [];
+let prefillDay = null;
+let currentViewMode = 'calendar'; // 'calendar' | 'assignee'
+let currentPerson = '전체';
+
+const PEOPLE = ['김현정', '김예지', '김다예', '이소현', '이유정', '김희종'];
+
+const STATUSES = ['시안제작', '컨펌완료', '발주완료'];
+const STATUS_STYLE = {
+  '시안제작': { bg:'#fff7ed', color:'#c2410c', dot:'#f97316' },
+  '컨펌완료':  { bg:'#f0fdf4', color:'#15803d', dot:'#22c55e' },
+  '발주완료':  { bg:'#f5f3ff', color:'#6d28d9', dot:'#8b5cf6' },
+};
+const STATUS_STORAGE_KEY = 'iljalleo_event_statuses_2026';
+const ASSIGNEE_STORAGE_KEY = 'iljalleo_event_assignees_2026';
+
+let eventStatuses = {};     // key → status string
+let assigneeOverrides = {}; // key → assignee string
+
+function loadEventStatuses() {
+  try { eventStatuses = JSON.parse(localStorage.getItem(STATUS_STORAGE_KEY)) || {}; }
+  catch(e) { eventStatuses = {}; }
+}
+function saveEventStatuses() {
+  localStorage.setItem(STATUS_STORAGE_KEY, JSON.stringify(eventStatuses));
+}
+function loadAssigneeOverrides() {
+  try { assigneeOverrides = JSON.parse(localStorage.getItem(ASSIGNEE_STORAGE_KEY)) || {}; }
+  catch(e) { assigneeOverrides = {}; }
+}
+function saveAssigneeOverrides() {
+  localStorage.setItem(ASSIGNEE_STORAGE_KEY, JSON.stringify(assigneeOverrides));
+}
+function getEventKey(e) {
+  return [e.month, e.day, e.category, e.content.substring(0,30)].join('||');
+}
+// 개별 내용 항목 키 (내용 줄별 고유 식별자)
+function getSubItemKey(month, day, category, itemText) {
+  return [month, day, category, itemText.trim().substring(0,40)].join('|~|');
+}
+// 이벤트의 서브아이템 키 목록
+function getSubItemKeys(e) {
+  return e.content.split(' / ').filter(x=>x.trim())
+    .map(item => getSubItemKey(e.month, e.day, e.category, item));
+}
+// 캘린더 태그용: 이벤트에 상태 있는 서브아이템이 있는지 확인
+function getEventDotStatus(e) {
+  const keys = getSubItemKeys(e);
+  const priority = ['발주완료','컨펌완료','시안제작'];
+  for(const p of priority) {
+    if(keys.some(k => eventStatuses[k] === p)) return p;
+  }
+  return null;
+}
+
+// 키 기반 셀렉터 함수 (서브아이템용)
+function statusSelectByKey(key) {
+  const cur = eventStatuses[key] || '';
+  const safeKey = key.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const opts = `<option value="">─ 진행상태 선택 ─</option>` +
+    STATUSES.map(s=>`<option${cur===s?' selected':''}>${s}</option>`).join('');
+  return `<select class="status-select" onclick="event.stopPropagation()"
+    onchange="updateStatus('${safeKey}',this.value)">${opts}</select>`;
+}
+function assigneeSelectByKey(key, fallbackAssignee) {
+  const cur = assigneeOverrides[key] || fallbackAssignee || '';
+  const safeKey = key.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const opts = `<option value="">담당자 선택</option>` +
+    PEOPLE.map(p=>`<option${cur===p?' selected':''}>${p}</option>`).join('');
+  return `<select class="status-select" onclick="event.stopPropagation()"
+    onchange="updateAssignee('${safeKey}',this.value)">${opts}</select>`;
+}
+function statusBadgeByKey(key) {
+  const s = eventStatuses[key];
+  if(!s) return '';
+  const st = STATUS_STYLE[s];
+  return `<span class="status-badge" style="background:${st.bg};color:${st.color};">
+    <span style="width:6px;height:6px;border-radius:50%;background:${st.dot};display:inline-block;"></span>${s}
+  </span>`;
+}
+
+// 기존 이벤트 단위 함수 (담당자별 탭 행용으로 유지)
+function statusSelectHTML(e) {
+  const key = getEventKey(e);
+  return statusSelectByKey(key);
+}
+function assigneeSelectHTML(e) {
+  const key = getEventKey(e);
+  const fallback = e.custom ? (e.assignee||'') : (CAT_ASSIGNEE[e.category]||'');
+  return assigneeSelectByKey(key, fallback);
+}
+function statusBadgeHTML(e) {
+  return statusBadgeByKey(getEventKey(e));
+}
+
+let openModalMonth = null, openModalDay = null;
+
+function updateStatus(key, status) {
+  if(status) eventStatuses[key] = status;
+  else delete eventStatuses[key];
+  saveEventStatuses();
+  if(openModalMonth) showDetailModal(openModalMonth, openModalDay);
+  if(currentViewMode==='assignee') renderAssigneeView();
+  else renderCalendar();
+}
+
+function assigneeSelectHTML(e) {
+  const key = getEventKey(e);
+  const cur = assigneeOverrides[key] || (e.custom ? (e.assignee||'') : (CAT_ASSIGNEE[e.category]||''));
+  const safeKey = key.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const opts = `<option value="">담당자 선택</option>` +
+    PEOPLE.map(p=>`<option${cur===p?' selected':''}>${p}</option>`).join('');
+  return `<select class="status-select" onclick="event.stopPropagation()"
+    onchange="updateAssignee('${safeKey}',this.value)">${opts}</select>`;
+}
+
+function updateAssignee(key, assignee) {
+  if(assignee) assigneeOverrides[key] = assignee;
+  else delete assigneeOverrides[key];
+  saveAssigneeOverrides();
+  if(openModalMonth) showDetailModal(openModalMonth, openModalDay);
+  if(currentViewMode==='assignee') renderAssigneeView();
+  else renderCalendar();
+}
+const MONTH_NAMES = {4:'4월',5:'5월',6:'6월',7:'7월'};
+const DAY_NAMES = ['일','월','화','수','목','금','토'];
+
+// 카테고리 → 기본 담당자 매핑 (Excel 기준)
+const CAT_ASSIGNEE = {
+  '전자신문':       '이소현',
+  '보도자료':       '이소현',
+  '보도자료/미디어':'이소현',
+  '뉴스레터':       '이소현',
+  '외부-온라인':    '이소현',
+  '블로그':         '이유정',
+  '링크드인':       '이유정',
+  '인스타그램':     '이유정',
+  '앰배서더':       '이유정',
+  '내부-온라인':    '이유정',
+  'g벨리광고':      '김예지',
+  '외부-오프라인':  '김예지',
+  '내부-오프라인':  '김예지',
+  '디자인':         '김희종',
+  '내부-기타':      '김현정',
+};
+
+// ─── localStorage 관리 ───────────────────────────────────────
+function loadCustomEvents() {
+  try { customEvents = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch(e) { customEvents = []; }
+}
+function saveCustomEvents() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(customEvents));
+}
+
+function getAllEvents() {
+  return [
+    ...BASE_EVENTS.map(e => ({...e, custom: false})),
+    ...customEvents.map(e => ({...e, custom: true}))
+  ];
+}
+
+// ─── 색상 / 레이블 ───────────────────────────────────────────
+function getColor(cat) { return CATEGORY_COLORS[cat] || '#94a3b8'; }
+function getCatLabel(cat) {
+  const m = {'보도자료/미디어':'보도/미디어','내부-온라인':'내부-온라인','외부-온라인':'외부-온라인','내부-오프라인':'내부-오프라인','외부-오프라인':'외부-오프라인','g벨리광고':'G벨리광고','내부-기타':'기타'};
+  return m[cat] || cat;
+}
+function getCategoriesForMonth(m) {
+  const evts = getAllEvents().filter(e => e.month === m);
+  const cats = [...new Set(evts.map(e => e.category))];
+  return cats.sort((a,b) => evts.filter(e=>e.category===b).length - evts.filter(e=>e.category===a).length);
+}
+
+// ─── 렌더링 ──────────────────────────────────────────────────
+function renderLegend() {
+  const cats = getCategoriesForMonth(currentMonth);
+  document.getElementById('legend').innerHTML = cats.map(cat => `
+    <div class="legend-item ${activeFilter===cat?'active-filter':''}" onclick="toggleFilter('${cat}')">
+      <div class="legend-dot" style="background:${getColor(cat)}"></div>
+      <span>${getCatLabel(cat)}</span>
+    </div>`).join('');
+}
+
+function renderStats() {
+  const evts = getAllEvents().filter(e => e.month===currentMonth && (!activeFilter||e.category===activeFilter));
+  const custom = customEvents.filter(e=>e.month===currentMonth);
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat-card"><div class="stat-dot" style="background:#2563eb"></div>
+      <div><div class="stat-label">총 일정</div><div class="stat-count">${evts.length}건</div></div></div>
+    <div class="stat-card"><div class="stat-dot" style="background:#22c55e"></div>
+      <div><div class="stat-label">활동 일수</div><div class="stat-count">${[...new Set(evts.map(e=>e.day))].length}일</div></div></div>
+    <div class="stat-card"><div class="stat-dot" style="background:#f59e0b"></div>
+      <div><div class="stat-label">채널 수</div><div class="stat-count">${getCategoriesForMonth(currentMonth).length}개</div></div></div>
+    ${custom.length>0?`<div class="stat-card"><div class="stat-dot" style="background:#fbbf24"></div>
+      <div><div class="stat-label">추가 일정</div><div class="stat-count">${custom.length}건</div></div></div>`:''}
+  `;
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('calendarGrid');
+  const startDay = MONTH_START_DAYS[currentMonth];
+  const totalDays = MONTH_DAYS[currentMonth];
+  const today = new Date();
+
+  const dayMap = {};
+  getAllEvents().filter(e=>e.month===currentMonth).forEach(e=>{
+    if(!dayMap[e.day]) dayMap[e.day]=[];
+    dayMap[e.day].push(e);
+  });
+
+  let html='';
+  for(let i=0;i<startDay;i++) html+='<div class="cal-cell empty"></div>';
+
+  for(let d=1;d<=totalDays;d++){
+    const dow=(startDay+d-1)%7;
+    const isSun=dow===0,isSat=dow===6;
+    const isToday=today.getFullYear()===2026&&today.getMonth()+1===currentMonth&&today.getDate()===d;
+    const cls=['cal-cell',isSun?'sun-cell':'',isSat?'sat-cell':'',isToday?'today':''].filter(Boolean).join(' ');
+
+    const allEvts=dayMap[d]||[];
+    const filtered=activeFilter?allEvts.filter(e=>e.category===activeFilter):allEvts;
+    const shown=filtered.slice(0,3);
+    const extra=filtered.length-3;
+
+    const tagsHtml=shown.map(e=>{
+      const st = getEventDotStatus(e);
+      const dot = st ? `<span class="status-dot-tag" style="background:${STATUS_STYLE[st].dot}"></span>` : '';
+      return `<button class="event-tag ${e.custom?'custom-event':''}" style="background:${getColor(e.category)}"
+        onclick="event.stopPropagation();showDetailModal(${currentMonth},${d})">
+        ${dot}
+        <span class="event-tag-text" title="${e.content}">${getCatLabel(e.category)}: ${e.content.substring(0,16)}${e.content.length>16?'…':''}</span>
+        ${e.custom?`<span class="del-btn" onclick="event.stopPropagation();deleteCustomEventByValue(${e.month},${e.day},'${e.category.replace(/'/g,"\\'")}','${e.content.replace(/'/g,"\\'").substring(0,30)}')">×</span>`:''}
+      </button>`;
+    }).join('');
+
+    const moreHtml=extra>0?`<div class="more-tag" onclick="showDetailModal(${currentMonth},${d})">+${extra}개 더보기</div>`:'';
+
+    html+=`<div class="${cls}" onclick="showDetailModal(${currentMonth},${d})">
+      <div class="day-header">
+        <div class="day-num">${d}</div>
+        <button class="add-btn" onclick="event.stopPropagation();openAddModal(${d})">＋</button>
+      </div>
+      ${tagsHtml}${moreHtml}
+    </div>`;
+  }
+
+  const remainder=(startDay+totalDays)%7;
+  if(remainder!==0) for(let i=0;i<7-remainder;i++) html+='<div class="cal-cell empty"></div>';
+  grid.innerHTML=html;
+}
+
+// ─── 상세 모달 ───────────────────────────────────────────────
+let detailMonth, detailDay;
+function showDetailModal(month,day){
+  const events=getAllEvents().filter(e=>e.month===month&&e.day===day);
+  if(!events.length)return;
+  detailMonth=month; detailDay=day;
+  openModalMonth=month; openModalDay=day;
+  const dayNames=['일','월','화','수','목','금','토'];
+  const dow=(MONTH_START_DAYS[month]+day-1)%7;
+  document.getElementById('modalDate').textContent=`2026년 ${month}월`;
+  document.getElementById('modalTitle').textContent=`${day}일 (${dayNames[dow]}) 홍보 일정`;
+
+  document.getElementById('modalEvents').innerHTML=events.map(e=>{
+    const defaultAssignee = getEventAssignee(e);
+    const subItems = e.content.split(' / ').filter(x=>x.trim());
+
+    const subItemsHTML = subItems.map(item=>{
+      const key = getSubItemKey(e.month, e.day, e.category, item);
+      return `<div class="modal-sub-item">
+        <div class="modal-sub-text">${item.trim()}</div>
+        <div class="modal-sub-controls">
+          <div class="modal-sub-control">
+            <label>담당자</label>
+            ${assigneeSelectByKey(key, defaultAssignee)}
+          </div>
+          <div class="modal-sub-control">
+            <label>진행상태</label>
+            ${statusSelectByKey(key)}
+            ${statusBadgeByKey(key)}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="modal-event ${e.custom?'custom-modal-event':''}">
+      <div class="modal-event-header">
+        <span class="modal-event-cat" style="background:${getColor(e.category)}">${getCatLabel(e.category)}${e.custom?'<span class="custom-badge">NEW</span>':''}</span>
+        ${e.designer?`<span style="font-size:11px;color:#7c3aed;font-weight:600;">🎨 ${e.designer}</span>`:''}
+        ${e.custom?`<button class="modal-event-del" style="margin-left:auto" onclick="deleteCustomEventByValue(${e.month},${e.day},'${e.category.replace(/'/g,"\\'")}','${e.content.replace(/'/g,"\\'").substring(0,30)}',true)" title="삭제">×</button>`:''}
+      </div>
+      <div class="modal-sub-items">${subItemsHTML}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeDetailModal(event){
+  if(!event||event.target===document.getElementById('modalOverlay')){
+    document.getElementById('modalOverlay').classList.remove('open');
+    openModalMonth=null; openModalDay=null;
+  }
+}
+
+// ─── 일정 추가 모달 ──────────────────────────────────────────
+function openAddModal(day){
+  prefillDay=day||null;
+  document.getElementById('formMonth').value=currentMonth;
+  document.getElementById('formDay').value=day||'';
+  document.getElementById('formCategory').value='';
+  document.getElementById('formCategoryCustom').style.display='none';
+  document.getElementById('formAssignee').value='';
+  document.getElementById('formDesigner').value='';
+  document.getElementById('formContent').value='';
+  document.getElementById('addModalOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('formDay').focus(),100);
+}
+function closeAddModal(){ document.getElementById('addModalOverlay').classList.remove('open'); }
+function closeAddModalOutside(e){ if(e.target===document.getElementById('addModalOverlay')) closeAddModal(); }
+function onCatChange(){
+  const v=document.getElementById('formCategory').value;
+  document.getElementById('formCategoryCustom').style.display=v==='__custom__'?'block':'none';
+}
+function saveNewEvent(){
+  const month=parseInt(document.getElementById('formMonth').value);
+  const day=parseInt(document.getElementById('formDay').value);
+  let category=document.getElementById('formCategory').value;
+  if(category==='__custom__') category=document.getElementById('formCategoryCustom').value.trim();
+  const assignee=document.getElementById('formAssignee').value;
+  const designer=document.getElementById('formDesigner').value;
+  const content=document.getElementById('formContent').value.trim();
+
+  if(!day||day<1||day>31){alert('날짜를 정확히 입력해주세요.');return;}
+  if(!category){alert('채널/카테고리를 선택해주세요.');return;}
+  if(!assignee){alert('담당자를 선택해주세요.');return;}
+  if(!content){alert('일정 내용을 입력해주세요.');return;}
+
+  customEvents.push({month,day,category,assignee,designer,content});
+  saveCustomEvents();
+
+  // ── SharePoint 자동 저장 ──────────────────────────────────
+  const FLOW_URL = 'https://default9452cae0943443ed8edbdccd26f181.f0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/ce29d01d22cf4785ab82d14b14d9affe/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=w1dnxixh6TLNFx7LEmTK7XhWwzqBxLZ82bDn9t0zuIE';
+
+  // 채널 대분류 자동 매핑
+  function toChannel(cat) {
+    if(['블로그','링크드인','인스타그램','뉴스레터','뉴스레터-공지사항','뉴스레터-산업레이더','내부-온라인'].includes(cat)) return '온라인';
+    if(['내부-오프라인'].includes(cat)) return '오프라인';
+    if(['외부-온라인','전자신문','보도자료','보도자료/미디어'].includes(cat)) return '외부-온라인';
+    if(['외부-오프라인'].includes(cat)) return '외부-오프라인';
+    if(['디자인'].includes(cat)) return '디자인';
+    return '기타';
+  }
+
+  if(FLOW_URL !== '여기에_파워오토메이트_전체URL_붙여넣기') {
+    fetch(FLOW_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title:    content.substring(0, 50),
+        date:     `2026-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T00:00:00Z`,
+        channel:  toChannel(category),
+        category: category,
+        assignee: assignee,
+        designer: designer || '해당없음',
+        content:  content,
+        status:   '대기'
+      })
+    })
+    .then(r => {
+      if(r.ok) showToast('✅ SharePoint에 저장됐어요!');
+      else showToast('⚠️ SharePoint 저장 실패 (상태코드: ' + r.status + ')');
+    })
+    .catch(() => showToast('⚠️ SharePoint 연결 오류'));
+  }
+  // ────────────────────────────────────────────────────────
+
+  closeAddModal();
+  if(currentViewMode==='assignee') {
+    currentPerson = assignee || '전체';
+    renderAssigneeView();
+  } else {
+    if(month!==currentMonth) switchMonth(month);
+    else renderAll();
+  }
+}
+
+// ─── 삭제 ────────────────────────────────────────────────────
+function deleteCustomEventByValue(month,day,category,contentStart,fromModal){
+  const idx=customEvents.findIndex(e=>
+    e.month===month&&e.day===day&&e.category===category&&e.content.startsWith(contentStart.substring(0,20))
+  );
+  if(idx===-1)return;
+  if(!confirm('이 일정을 삭제할까요?'))return;
+  customEvents.splice(idx,1);
+  saveCustomEvents();
+  if(currentViewMode==='assignee') renderAssigneeView();
+  else renderAll();
+  if(fromModal && currentViewMode!=='assignee') showDetailModal(month,day);
+}
+
+// ─── 필터 / 월 전환 ──────────────────────────────────────────
+function toggleFilter(cat){ activeFilter=activeFilter===cat?null:cat; renderAll(); }
+function switchMonth(m){
+  currentMonth=m; activeFilter=null;
+  currentViewMode='calendar';
+  document.querySelectorAll('.month-tab').forEach(t=>{
+    t.classList.toggle('active', parseInt(t.dataset.month)===m && t.dataset.view!=='assignee');
+  });
+  document.getElementById('calendarView').style.display='';
+  document.getElementById('assigneeView').classList.remove('visible');
+  renderAll();
+}
+function renderAll(){ renderLegend(); renderStats(); renderCalendar(); }
+
+// ─── 담당자별 뷰 ─────────────────────────────────────────────
+function getEventAssignee(e) {
+  const key = getEventKey(e);
+  if(assigneeOverrides[key]) return assigneeOverrides[key];
+  if(e.custom) return e.assignee || '미지정';
+  return CAT_ASSIGNEE[e.category] || '미지정';
+}
+
+function switchView(view) {
+  currentViewMode = view;
+  if(view === 'assignee') {
+    document.querySelectorAll('.month-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelector('[data-view="assignee"]').classList.add('active');
+    document.getElementById('calendarView').style.display='none';
+    document.getElementById('assigneeView').classList.add('visible');
+    currentPerson='전체';
+    renderAssigneeView();
+  }
+}
+
+function switchPerson(name) {
+  currentPerson = name;
+  renderAssigneeView();
+}
+
+function renderAssigneeView() {
+  const allEvts = getAllEvents();
+
+  // 인물별 이벤트 수 계산
+  const personCounts = {};
+  PEOPLE.forEach(p => personCounts[p] = 0);
+  allEvts.forEach(e => {
+    const a = getEventAssignee(e);
+    if(PEOPLE.includes(a)) personCounts[a]++;
+  });
+
+  // 요약 카드
+  document.getElementById('personSummaryCards').innerHTML = PEOPLE.map(p => `
+    <div class="person-card ${currentPerson===p?'active':''}" onclick="switchPerson('${p}')">
+      <div class="person-card-name">${p}</div>
+      <div class="person-card-count">${personCounts[p]}</div>
+      <div class="person-card-label">건</div>
+    </div>`).join('');
+
+  // 인물 필터 pills
+  document.getElementById('personPills').innerHTML =
+    ['전체', ...PEOPLE].map(p => `
+      <div class="person-pill ${currentPerson===p?'active':''}" onclick="switchPerson('${p}')">${p}</div>
+    `).join('');
+
+  // 필터된 이벤트
+  const filtered = currentPerson === '전체'
+    ? allEvts
+    : allEvts.filter(e => getEventAssignee(e) === currentPerson);
+
+  if(!filtered.length) {
+    document.getElementById('assigneeTaskList').innerHTML = `<div class="no-tasks">📭 해당 담당자의 일정이 없습니다.</div>`;
+    return;
+  }
+
+  // 월별 그룹 → 날짜 정렬
+  const byMonth = {4:[],5:[],6:[],7:[]};
+  filtered.forEach(e => { if(byMonth[e.month]) byMonth[e.month].push(e); });
+
+  let html = '';
+  [4,5,6,7].forEach(m => {
+    const evts = byMonth[m].sort((a,b)=>a.day-b.day);
+    if(!evts.length) return;
+    html += `<div class="month-section">
+      <div class="month-section-title">
+        2026년 ${MONTH_NAMES[m]} <span>${evts.length}건</span>
+      </div>`;
+    evts.forEach(e => {
+      const dow = (MONTH_START_DAYS[m]+e.day-1)%7;
+      const isSun=dow===0, isSat=dow===6;
+      const dayColor = isSun?'color:#ef4444':isSat?'color:#3b82f6':'';
+      const assigneeName = getEventAssignee(e);
+      html += `
+        <div class="task-row ${e.custom?'custom-row':''}">
+          <div class="task-date">
+            <div style="${dayColor}">${e.day}일</div>
+            <div class="task-date-dow" style="${dayColor}">${DAY_NAMES[dow]}요일</div>
+          </div>
+          <span class="task-cat-badge" style="background:${getColor(e.category)}">${getCatLabel(e.category)}</span>
+          <div class="task-content">
+            ${e.content.replace(/ \/ /g,' · ')}
+            <div class="task-meta">
+              ${currentPerson==='전체'?`<span class="task-meta-tag" style="background:#f1f5f9;color:#475569;">👤 ${assigneeName}</span>`:''}
+              ${e.designer?`<span class="task-meta-tag task-meta-designer">🎨 ${e.designer}</span>`:''}
+              ${e.custom?`<span class="task-meta-tag task-meta-custom">직접 추가</span>`:''}
+              ${statusBadgeHTML(e)}
+            </div>
+          </div>
+          <div class="task-status-wrap" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+            ${assigneeSelectHTML(e)}
+            ${statusSelectHTML(e)}
+          </div>
+        </div>`;
+    });
+    html += '</div>';
+  });
+
+  document.getElementById('assigneeTaskList').innerHTML = html;
+}
+
+// ─── 토스트 알림 ─────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  Object.assign(t.style, {
+    position:'fixed', bottom:'28px', left:'50%', transform:'translateX(-50%)',
+    background:'#1e293b', color:'white', padding:'10px 20px', borderRadius:'10px',
+    fontSize:'13px', fontWeight:'600', zIndex:'9999', boxShadow:'0 4px 12px rgba(0,0,0,0.2)',
+    transition:'opacity 0.3s'
+  });
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(), 300); }, 2500);
+}
+
+// ─── 초기화 ──────────────────────────────────────────────────
+loadCustomEvents();
+loadEventStatuses();
+loadAssigneeOverrides();
+const nowMonth=new Date().getMonth()+1;
+if(nowMonth>=4&&nowMonth<=7){
+  currentMonth=nowMonth;
+  document.querySelectorAll('.month-tab').forEach(t=>t.classList.toggle('active',parseInt(t.dataset.month)===currentMonth));
+}
+renderAll();
+</script>
+</body>
+</html>
