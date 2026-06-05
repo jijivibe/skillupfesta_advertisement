@@ -780,6 +780,7 @@ function saveNewEvent(){
 
   // ── SharePoint 자동 저장 ──────────────────────────────────
   const FLOW_URL = 'https://default9452cae0943443ed8edbdccd26f181.f0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/ce29d01d22cf4785ab82d14b14d9affe/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=w1dnxixh6TLNFx7LEmTK7XhWwzqBxLZ82bDn9t0zuIE';
+  const DELETE_FLOW_URL = 'https://default9452cae0943443ed8edbdccd26f181.f0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/45290c131bcc4eedad2a22f0be18bf65/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=F_x6YiSs3TX3_db-D94f0z60c8yBbpVHYhxPyNnVDcI';
 
   // 채널 대분류 자동 매핑
   function toChannel(cat) {
@@ -806,11 +807,15 @@ function saveNewEvent(){
         status:   '대기'
       })
     })
-    .then(r => {
-      if(r.ok) showToast('✅ SharePoint에 저장됐어요!');
-      else showToast('⚠️ SharePoint 저장 실패 (상태코드: ' + r.status + ')');
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(data => {
+      if(data && data.id) {
+        customEvents[customEvents.length-1].spId = data.id;
+        saveCustomEvents();
+      }
+      showToast('✅ SharePoint에 저장됐어요!');
     })
-    .catch(() => showToast('⚠️ SharePoint 연결 오류'));
+    .catch(err => showToast('⚠️ SharePoint 저장 실패 (' + err + ')'));
   }
   // ────────────────────────────────────────────────────────
 
@@ -825,14 +830,30 @@ function saveNewEvent(){
 }
 
 // ─── 삭제 ────────────────────────────────────────────────────
+const DELETE_FLOW_URL = 'https://default9452cae0943443ed8edbdccd26f181.f0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/45290c131bcc4eedad2a22f0be18bf65/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=F_x6YiSs3TX3_db-D94f0z60c8yBbpVHYhxPyNnVDcI';
+
 function deleteCustomEventByValue(month,day,category,contentStart,fromModal){
   const idx=customEvents.findIndex(e=>
     e.month===month&&e.day===day&&e.category===category&&e.content.startsWith(contentStart.substring(0,20))
   );
   if(idx===-1)return;
   if(!confirm('이 일정을 삭제할까요?'))return;
+
+  const spId = customEvents[idx].spId;
   customEvents.splice(idx,1);
   saveCustomEvents();
+
+  // SharePoint에서도 삭제
+  if(spId) {
+    fetch(DELETE_FLOW_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: spId })
+    })
+    .then(r => r.ok ? showToast('🗑 SharePoint에서도 삭제됐어요!') : showToast('⚠️ SharePoint 삭제 실패'))
+    .catch(() => showToast('⚠️ SharePoint 삭제 연결 오류'));
+  }
+
   if(currentViewMode==='assignee') renderAssigneeView();
   else renderAll();
   if(fromModal && currentViewMode!=='assignee') showDetailModal(month,day);
