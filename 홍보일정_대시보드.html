@@ -8,6 +8,42 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #f0f4f8; color: #1e293b; }
 
+  /* 비밀번호 화면 */
+  #pwScreen {
+    position: fixed; inset: 0; z-index: 9999;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #pwBox {
+    background: white; border-radius: 20px; padding: 40px 36px;
+    text-align: center; width: 320px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  #pwBox .pw-logo { font-size: 36px; margin-bottom: 12px; }
+  #pwBox h2 { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+  #pwBox p { font-size: 12px; color: #94a3b8; margin-bottom: 24px; }
+  #pwInput {
+    width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0;
+    border-radius: 10px; font-size: 20px; text-align: center;
+    letter-spacing: 8px; font-weight: 700; color: #1e293b;
+    outline: none; transition: border-color 0.15s;
+    font-family: inherit;
+  }
+  #pwInput:focus { border-color: #2563eb; }
+  #pwInput.error { border-color: #ef4444; animation: shake 0.3s; }
+  #pwBtn {
+    width: 100%; margin-top: 12px; padding: 12px;
+    background: linear-gradient(135deg, #1e3a5f, #2563eb);
+    color: white; border: none; border-radius: 10px;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  #pwBtn:hover { opacity: 0.9; }
+  #pwError { font-size: 12px; color: #ef4444; margin-top: 8px; min-height: 16px; }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)}
+  }
+
   .header {
     background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
     color: white; padding: 20px 28px 16px;
@@ -240,6 +276,19 @@
 </style>
 </head>
 <body>
+
+<!-- 비밀번호 화면 -->
+<div id="pwScreen">
+  <div id="pwBox">
+    <div class="pw-logo">🎪</div>
+    <h2>2026 일잘러 페스타</h2>
+    <p>홍보 일정 대시보드</p>
+    <input type="password" id="pwInput" placeholder="- - - -" maxlength="10"
+      onkeydown="if(event.key==='Enter') checkPw()">
+    <button id="pwBtn" onclick="checkPw()">입장하기</button>
+    <div id="pwError"></div>
+  </div>
+</div>
 
 <div class="header">
   <div class="header-left">
@@ -920,6 +969,29 @@ function showToast(msg) {
   });
   document.body.appendChild(t);
   setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(), 300); }, 2500);
+}
+
+// ─── 비밀번호 ────────────────────────────────────────────────
+const PW = '0208';
+function checkPw() {
+  const val = document.getElementById('pwInput').value;
+  const errEl = document.getElementById('pwError');
+  const inputEl = document.getElementById('pwInput');
+  if(val === PW) {
+    sessionStorage.setItem('iljalleo_auth', '1');
+    document.getElementById('pwScreen').style.display = 'none';
+    inputEl.value = '';
+    errEl.textContent = '';
+  } else {
+    errEl.textContent = '비밀번호가 틀렸어요.';
+    inputEl.classList.add('error');
+    inputEl.value = '';
+    setTimeout(() => inputEl.classList.remove('error'), 400);
+  }
+}
+// 이미 인증됐으면 바로 통과
+if(sessionStorage.getItem('iljalleo_auth') === '1') {
+  document.getElementById('pwScreen').style.display = 'none';
 }
 
 // ─── 초기화 ──────────────────────────────────────────────────
