@@ -807,10 +807,17 @@ function saveNewEvent(){
         status:   '대기'
       })
     })
-    .then(r => r.ok ? r.json() : Promise.reject(r.status))
-    .then(data => {
-      if(data && data.id) {
-        customEvents[customEvents.length-1].spId = data.id;
+    .then(r => r.ok ? r.text() : Promise.reject(r.status))
+    .then(text => {
+      let spId = null;
+      try {
+        const data = JSON.parse(text);
+        spId = typeof data === 'number' ? data : (data.id || data.ID || null);
+      } catch(e) {
+        spId = parseInt(text);
+      }
+      if(spId) {
+        customEvents[customEvents.length-1].spId = spId;
         saveCustomEvents();
       }
       showToast('✅ SharePoint에 저장됐어요!');
