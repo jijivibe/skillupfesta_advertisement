@@ -255,6 +255,39 @@
   .cat-group-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 10px; color: white; }
   .cat-group-count { font-size: 11px; color: #94a3b8; }
 
+  /* 할일 리스트 테이블 */
+  .todo-month-pills { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
+  .todo-month-pill {
+    padding:5px 16px; border-radius:16px; cursor:pointer; font-size:12px; font-weight:600;
+    border:1px solid #e2e8f0; color:#64748b; background:white; transition:all 0.15s;
+  }
+  .todo-month-pill:hover { border-color:#94a3b8; }
+  .todo-month-pill.active { background:#1e3a5f; color:white; border-color:#1e3a5f; }
+  .todo-filter-bar { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+  .todo-filter-bar label { font-size:11px; color:#64748b; font-weight:600; }
+  .todo-filter-bar select {
+    font-size:12px; padding:5px 8px; border:1px solid #e2e8f0; border-radius:8px;
+    background:white; color:#374151; font-family:inherit; cursor:pointer;
+  }
+  .todo-summary { font-size:12px; color:#94a3b8; margin-left:auto; }
+  .todo-table-wrap { background:white; border-radius:12px; border:1px solid #e2e8f0; overflow:hidden; }
+  .todo-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .todo-table th {
+    background:#f8fafc; padding:10px 14px; text-align:left; font-size:11px;
+    font-weight:700; color:#64748b; border-bottom:1px solid #e2e8f0; white-space:nowrap;
+  }
+  .todo-table td { padding:10px 14px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  .todo-table tr:last-child td { border-bottom:none; }
+  .todo-table tr:hover td { background:#fafafa; }
+  .todo-table tr.custom-row td { background:#fefce8; }
+  .todo-content-cell { max-width:260px; color:#374151; line-height:1.4; }
+  .todo-date-input {
+    border:1px solid #e2e8f0; border-radius:6px; padding:3px 6px;
+    font-size:11px; color:#374151; font-family:inherit; width:110px;
+  }
+  .todo-date-input:focus { outline:none; border-color:#2563eb; }
+  .todo-empty { text-align:center; padding:40px; color:#94a3b8; font-size:14px; }
+
   /* 진행상태 */
   .status-select {
     font-size: 11px; padding: 4px 8px; border-radius: 6px;
@@ -346,6 +379,12 @@
         <div class="cal-day-header sat">토</div>
       </div>
       <div class="calendar-grid" id="calendarGrid"></div>
+    </div>
+
+    <!-- 캘린더 하단 할일 리스트 -->
+    <div style="margin-top:20px;">
+      <div class="todo-filter-bar" id="todoFilterBar"></div>
+      <div id="todoTableWrap"></div>
     </div>
   </div>
 
@@ -559,6 +598,18 @@ function statusBadgeHTML(e) {
 
 let openModalMonth = null, openModalDay = null;
 let expandedMonths = new Set(); // 담당자별 탭 열린 월
+let todoMonth = 0; // 0=전체, 4~7
+let todoCatFilter = '';
+let todoAssigneeFilter = '';
+let todoStatusFilter = '';
+const DEADLINE_STORAGE_KEY = 'iljalleo_deadlines_2026';
+let deadlines = {};
+function loadDeadlines() { try { deadlines = JSON.parse(localStorage.getItem(DEADLINE_STORAGE_KEY))||{}; } catch(e){deadlines={};} }
+function saveDeadlines() { localStorage.setItem(DEADLINE_STORAGE_KEY, JSON.stringify(deadlines)); }
+function updateDeadline(key, val) {
+  if(val) deadlines[key]=val; else delete deadlines[key];
+  saveDeadlines();
+}
 
 function toggleMonth(m) {
   if(expandedMonths.has(m)) expandedMonths.delete(m);
@@ -903,6 +954,7 @@ function toggleFilter(cat){ activeFilter=activeFilter===cat?null:cat; renderAll(
 function switchMonth(m){
   currentMonth=m; activeFilter=null;
   currentViewMode='calendar';
+  todoCatFilter=''; todoAssigneeFilter=''; todoStatusFilter='';
   document.querySelectorAll('.month-tab').forEach(t=>{
     t.classList.toggle('active', parseInt(t.dataset.month)===m && t.dataset.view!=='assignee');
   });
@@ -910,7 +962,7 @@ function switchMonth(m){
   document.getElementById('assigneeView').classList.remove('visible');
   renderAll();
 }
-function renderAll(){ renderLegend(); renderStats(); renderCalendar(); }
+function renderAll(){ renderLegend(); renderStats(); renderCalendar(); renderTodoTable(); }
 
 // ─── 담당자별 뷰 ─────────────────────────────────────────────
 function getEventAssignee(e) {
@@ -922,14 +974,236 @@ function getEventAssignee(e) {
 
 function switchView(view) {
   currentViewMode = view;
+  document.querySelectorAll('.month-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('calendarView').style.display='none';
+  document.getElementById('assigneeView').classList.remove('visible');
+  document.getElementById('todoView').classList.remove('visible');
+
   if(view === 'assignee') {
-    document.querySelectorAll('.month-tab').forEach(t=>t.classList.remove('active'));
     document.querySelector('[data-view="assignee"]').classList.add('active');
-    document.getElementById('calendarView').style.display='none';
     document.getElementById('assigneeView').classList.add('visible');
     currentPerson='전체';
     renderAssigneeView();
+  } else if(view === 'todo') {
+    document.querySelector('[data-view="todo"]').classList.add('active');
+    document.getElementById('todoView').classList.add('visible');
+    todoMonth = new Date().getMonth()+1;
+    if(todoMonth < 4 || todoMonth > 7) todoMonth = 6;
+    renderTodoView();
   }
+}
+
+function renderTodoView() {
+  const allEvts = getAllEvents();
+  const months = [4,5,6,7];
+
+  // 월별 필터 pills
+  const pillsHtml = ['전체', ...months.map(m=>m+'월')].map((label, i) => {
+    const m = i === 0 ? 0 : months[i-1];
+    return `<div class="todo-month-pill ${todoMonth===m?'active':''}" onclick="setTodoMonth(${m})">${label}</div>`;
+  }).join('');
+
+  // 카테고리 목록
+  const allCats = [...new Set(allEvts.map(e=>e.category))].sort();
+  const allAssignees = PEOPLE;
+
+  // 필터 바
+  const filterHtml = `
+    <div class="todo-filter-bar">
+      <label>카테고리</label>
+      <select onchange="setTodoFilter('cat',this.value)">
+        <option value="">전체</option>
+        ${allCats.map(c=>`<option value="${c}" ${todoCatFilter===c?'selected':''}>${getCatLabel(c)}</option>`).join('')}
+      </select>
+      <label>담당자</label>
+      <select onchange="setTodoFilter('assignee',this.value)">
+        <option value="">전체</option>
+        ${allAssignees.map(a=>`<option value="${a}" ${todoAssigneeFilter===a?'selected':''}>${a}</option>`).join('')}
+      </select>
+      <label>진행상태</label>
+      <select onchange="setTodoFilter('status',this.value)">
+        <option value="">전체</option>
+        ${STATUSES.map(s=>`<option value="${s}" ${todoStatusFilter===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>`;
+
+  // 이벤트 필터링
+  let filtered = allEvts.filter(e => {
+    if(todoMonth && e.month !== todoMonth) return false;
+    if(todoCatFilter && e.category !== todoCatFilter) return false;
+    if(todoAssigneeFilter && getEventAssignee(e) !== todoAssigneeFilter) return false;
+    if(todoStatusFilter) {
+      const key = getEventKey(e);
+      if(eventStatuses[key] !== todoStatusFilter) return false;
+    }
+    return true;
+  }).sort((a,b) => a.month!==b.month ? a.month-b.month : a.day-b.day);
+
+  // 카테고리별 그룹핑
+  let tableRows = '';
+  let lastCat = null;
+  filtered.forEach(e => {
+    const key = getEventKey(e);
+    const assignee = getEventAssignee(e);
+    const status = eventStatuses[key] || '';
+    const deadline = deadlines[key] || '';
+    const dateStr = `2026-${String(e.month).padStart(2,'0')}-${String(e.day).padStart(2,'0')}`;
+    const safeKey = key.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    const statusSt = STATUS_STYLE[status];
+
+    // 카테고리 구분선
+    if(e.category !== lastCat) {
+      lastCat = e.category;
+      tableRows += `<tr style="background:#f8fafc;">
+        <td colspan="6" style="padding:8px 14px;">
+          <span style="background:${getColor(e.category)};color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;">${getCatLabel(e.category)}</span>
+        </td>
+      </tr>`;
+    }
+
+    tableRows += `<tr class="${e.custom?'custom-row':''}">
+      <td><span style="background:${getColor(e.category)};color:white;font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;">${getCatLabel(e.category)}</span></td>
+      <td class="todo-content-cell">${e.content.replace(/ \/ /g,' · ')}</td>
+      <td style="white-space:nowrap;">
+        <select class="status-select" onclick="event.stopPropagation()" onchange="updateAssignee('${safeKey}',this.value)">
+          <option value="">선택</option>
+          ${PEOPLE.map(p=>`<option${assignee===p?' selected':''}>${p}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select class="status-select" onclick="event.stopPropagation()" onchange="updateTodoStatus('${safeKey}',this.value)">
+          <option value="">─</option>
+          ${STATUSES.map(s=>`<option${status===s?' selected':''}>${s}</option>`).join('')}
+        </select>
+        ${statusSt?`<span class="status-badge" style="background:${statusSt.bg};color:${statusSt.color};margin-left:4px;display:inline-flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;border-radius:50%;background:${statusSt.dot};display:inline-block;"></span>${status}</span>`:''}
+      </td>
+      <td style="white-space:nowrap;color:#64748b;font-size:12px;">${e.month}/${e.day}</td>
+      <td>
+        <input type="date" class="todo-date-input" value="${deadline}"
+          onchange="updateDeadline('${safeKey}',this.value)" title="마감일 설정">
+      </td>
+    </tr>`;
+  });
+
+  const tableHtml = filtered.length === 0
+    ? `<div class="todo-empty">📭 조건에 맞는 일정이 없어요.</div>`
+    : `<div class="todo-table-wrap">
+        <table class="todo-table">
+          <thead><tr>
+            <th>카테고리</th><th>내용</th><th>담당자</th><th>진행상태</th><th>날짜</th><th>마감일</th>
+          </tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+       </div>`;
+
+  document.getElementById('todoFilters').innerHTML = `<div class="todo-month-pills">${pillsHtml}</div>${filterHtml}<div class="todo-summary">총 ${filtered.length}건</div>`;
+  document.getElementById('todoTableWrap').innerHTML = tableHtml;
+}
+
+function setTodoMonth(m) { todoMonth=m; renderTodoView(); }
+function setTodoFilter(type, val) {
+  if(type==='cat') todoCatFilter=val;
+  else if(type==='assignee') todoAssigneeFilter=val;
+  else if(type==='status') todoStatusFilter=val;
+  renderTodoTable();
+}
+function updateTodoStatus(key, status) {
+  if(status) eventStatuses[key]=status; else delete eventStatuses[key];
+  saveEventStatuses();
+  renderTodoTable();
+  renderCalendar();
+}
+
+function renderTodoTable() {
+  const allEvts = getAllEvents();
+  const allCats = [...new Set(allEvts.filter(e=>e.month===currentMonth).map(e=>e.category))].sort();
+
+  // 필터 바
+  document.getElementById('todoFilterBar').innerHTML = `
+    <div style="font-size:13px;font-weight:700;color:#1e293b;margin-right:8px;">📋 ${currentMonth}월 할일 리스트</div>
+    <label>카테고리</label>
+    <select onchange="setTodoFilter('cat',this.value)">
+      <option value="">전체</option>
+      ${allCats.map(c=>`<option value="${c}" ${todoCatFilter===c?'selected':''}>${getCatLabel(c)}</option>`).join('')}
+    </select>
+    <label>담당자</label>
+    <select onchange="setTodoFilter('assignee',this.value)">
+      <option value="">전체</option>
+      ${PEOPLE.map(a=>`<option value="${a}" ${todoAssigneeFilter===a?'selected':''}>${a}</option>`).join('')}
+    </select>
+    <label>진행상태</label>
+    <select onchange="setTodoFilter('status',this.value)">
+      <option value="">전체</option>
+      ${STATUSES.map(s=>`<option value="${s}" ${todoStatusFilter===s?'selected':''}>${s}</option>`).join('')}
+    </select>
+    <span class="todo-summary" id="todoCount"></span>
+  `;
+
+  // 필터링
+  let filtered = allEvts.filter(e => {
+    if(e.month !== currentMonth) return false;
+    if(todoCatFilter && e.category !== todoCatFilter) return false;
+    if(todoAssigneeFilter && getEventAssignee(e) !== todoAssigneeFilter) return false;
+    if(todoStatusFilter && eventStatuses[getEventKey(e)] !== todoStatusFilter) return false;
+    return true;
+  }).sort((a,b) => a.day !== b.day ? a.day-b.day : a.category.localeCompare(b.category));
+
+  document.getElementById('todoCount').textContent = `총 ${filtered.length}건`;
+
+  if(!filtered.length) {
+    document.getElementById('todoTableWrap').innerHTML = `<div class="todo-empty">📭 조건에 맞는 일정이 없어요.</div>`;
+    return;
+  }
+
+  let rows = '';
+  let lastCat = null;
+  filtered.forEach(e => {
+    const key = getEventKey(e);
+    const safeKey = key.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const assignee = getEventAssignee(e);
+    const status = eventStatuses[key] || '';
+    const deadline = deadlines[key] || '';
+    const statusSt = STATUS_STYLE[status];
+
+    if(e.category !== lastCat) {
+      lastCat = e.category;
+      rows += `<tr style="background:#f8fafc;">
+        <td colspan="6" style="padding:7px 14px;">
+          <span style="background:${getColor(e.category)};color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;">${getCatLabel(e.category)}</span>
+        </td>
+      </tr>`;
+    }
+
+    rows += `<tr class="${e.custom?'custom-row':''}">
+      <td><span style="background:${getColor(e.category)};color:white;font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;">${getCatLabel(e.category)}</span></td>
+      <td class="todo-content-cell">${e.content.replace(/ \/ /g,' · ')}</td>
+      <td>
+        <select class="status-select" onclick="event.stopPropagation()" onchange="updateAssignee('${safeKey}',this.value);renderTodoTable();">
+          <option value="">선택</option>
+          ${PEOPLE.map(p=>`<option${assignee===p?' selected':''}>${p}</option>`).join('')}
+        </select>
+      </td>
+      <td style="white-space:nowrap;">
+        <select class="status-select" onclick="event.stopPropagation()" onchange="updateTodoStatus('${safeKey}',this.value)">
+          <option value="">─</option>
+          ${STATUSES.map(s=>`<option${status===s?' selected':''}>${s}</option>`).join('')}
+        </select>
+        ${statusSt?`<span class="status-badge" style="background:${statusSt.bg};color:${statusSt.color};margin-left:4px;display:inline-flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;border-radius:50%;background:${statusSt.dot};display:inline-block;"></span>${status}</span>`:''}
+      </td>
+      <td style="color:#64748b;font-size:12px;white-space:nowrap;">${currentMonth}/${e.day}</td>
+      <td><input type="date" class="todo-date-input" value="${deadline}" onchange="updateDeadline('${safeKey}',this.value)" title="마감일 설정"></td>
+    </tr>`;
+  });
+
+  document.getElementById('todoTableWrap').innerHTML = `
+    <div class="todo-table-wrap">
+      <table class="todo-table">
+        <thead><tr>
+          <th>카테고리</th><th>내용</th><th>담당자</th><th>진행상태</th><th>날짜</th><th>마감일</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 }
 
 function switchPerson(name) {
@@ -1087,6 +1361,7 @@ if(sessionStorage.getItem('iljalleo_auth') === '1') {
 loadCustomEvents();
 loadEventStatuses();
 loadAssigneeOverrides();
+loadDeadlines();
 const nowMonth=new Date().getMonth()+1;
 if(nowMonth>=4&&nowMonth<=7){
   currentMonth=nowMonth;
