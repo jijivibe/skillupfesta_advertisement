@@ -472,6 +472,10 @@
       </select>
     </div>
     <div class="form-row">
+      <label>마감일 <span style="font-size:11px;color:#94a3b8;font-weight:400">(선택)</span></label>
+      <input type="date" id="formDeadline">
+    </div>
+    <div class="form-row">
       <label>일정 내용 <span style="color:#ef4444">*</span></label>
       <textarea id="formContent" placeholder="일정 내용을 입력하세요"></textarea>
     </div>
@@ -834,6 +838,7 @@ function openAddModal(day){
   document.getElementById('formCategoryCustom').style.display='none';
   document.getElementById('formAssignee').value='';
   document.getElementById('formDesigner').value='';
+  document.getElementById('formDeadline').value='';
   document.getElementById('formContent').value='';
   document.getElementById('addModalOverlay').classList.add('open');
   setTimeout(()=>document.getElementById('formDay').focus(),100);
@@ -851,6 +856,7 @@ function saveNewEvent(){
   if(category==='__custom__') category=document.getElementById('formCategoryCustom').value.trim();
   const assignee=document.getElementById('formAssignee').value;
   const designer=document.getElementById('formDesigner').value;
+  const deadline=document.getElementById('formDeadline').value;
   const content=document.getElementById('formContent').value.trim();
 
   if(!day||day<1||day>31){alert('날짜를 정확히 입력해주세요.');return;}
@@ -886,6 +892,7 @@ function saveNewEvent(){
         category: category,
         assignee: assignee,
         designer: designer || '해당없음',
+        deadline: deadline ? deadline + 'T00:00:00Z' : '',
         content:  content,
         status:   '대기'
       })
