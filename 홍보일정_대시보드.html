@@ -613,6 +613,76 @@ function saveDeadlines() { localStorage.setItem(DEADLINE_STORAGE_KEY, JSON.strin
 function updateDeadline(key, val) {
   if(val) deadlines[key]=val; else delete deadlines[key];
   saveDeadlines();
+  callUpdateFlow(key, { deadline: val });
+}
+
+// ─── SharePoint 연동 ─────────────────────────────────────────
+const READ_FLOW_URL = 'https://default9452cae0943443ed8edbdccd26f181.f0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/4d4b6defc308440da6db5aba1338d1bf/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=zMdiBVeNUMWW2nTWcUd0XHkiGRU32_wEOeHBIOR4nDE';
+const UPDATE_FLOW_URL = 'https://default9452cae0943443ed8edbdccd26f181.f0.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/61124811b4554715b41de7dd095901b2/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=S2tzNACV2jtrTLqE2to1hzTTsPmOckTw_9pCbb8AVDA';
+let spItemMap = {}; // eventKey → { id, status, assignee, deadline }
+
+function callUpdateFlow(key, updates) {
+  const sp = spItemMap[key];
+  if (!sp?.id) return;
+  const payload = {
+    id: sp.id,
+    status: updates.status !== undefined ? updates.status : (sp.status || ''),
+    assignee: updates.assignee !== undefined ? updates.assignee : (sp.assignee || ''),
+    deadline: updates.deadline !== undefined ? updates.deadline : (sp.deadline || '')
+  };
+  if (updates.status !== undefined) sp.status = updates.status;
+  if (updates.assignee !== undefined) sp.assignee = updates.assignee;
+  if (updates.deadline !== undefined) sp.deadline = updates.deadline;
+  fetch(UPDATE_FLOW_URL, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  }).catch(() => {});
+}
+
+async function loadFromSharePoint() {
+  try {
+    const r = await fetch(READ_FLOW_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+    if (!r.ok) return;
+    const items = await r.json();
+    if (!Array.isArray(items)) return;
+    items.forEach(item => {
+      const dateStr = item['일정'] || '';
+      if (!dateStr) return;
+      const d = new Date(dateStr);
+      if (isNaN(d)) return;
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      // 카테고리 필드 찾기
+      const catKey = Object.keys(item).find(k => k.includes('카테고리') && k.includes('Value'));
+      const category = catKey ? item[catKey] : '';
+      const title = (item['Title'] || '').substring(0, 30);
+      const key = [month, day, category, title].join('||');
+      const spId = item['ID'] || item['Id'];
+      // 진행상태 필드 찾기
+      const statusKey = Object.keys(item).find(k => k.includes('진행상태') && k.includes('Value'));
+      const status = statusKey ? item[statusKey] : '';
+      // 담당자 필드 찾기
+      const assigneeKey = Object.keys(item).find(k => k.includes('담당자') && k.includes('Value'));
+      const assignee = assigneeKey ? item[assigneeKey] : '';
+      // 마감일
+      const deadlineRaw = item['마감일'] || '';
+      const deadline = deadlineRaw ? deadlineRaw.substring(0, 10) : '';
+      spItemMap[key] = { id: spId, status, assignee, deadline };
+      // SP 데이터로 로컬 상태 덮어쓰기
+      if (status) eventStatuses[key] = status;
+      if (assignee) assigneeOverrides[key] = assignee;
+      if (deadline) deadlines[key] = deadline;
+    });
+    saveEventStatuses();
+    saveAssigneeOverrides();
+    saveDeadlines();
+    renderAll();
+    if (currentViewMode === 'assignee') renderAssigneeView();
+    if (currentViewMode === 'todo') renderTodoTable();
+  } catch(e) {
+    console.warn('SharePoint 로드 실패:', e);
+  }
 }
 
 function toggleMonth(m) {
@@ -625,6 +695,7 @@ function updateStatus(key, status) {
   if(status) eventStatuses[key] = status;
   else delete eventStatuses[key];
   saveEventStatuses();
+  callUpdateFlow(key, { status });
   if(openModalMonth) showDetailModal(openModalMonth, openModalDay);
   if(currentViewMode==='assignee') renderAssigneeView();
   else renderCalendar();
@@ -644,6 +715,7 @@ function updateAssignee(key, assignee) {
   if(assignee) assigneeOverrides[key] = assignee;
   else delete assigneeOverrides[key];
   saveAssigneeOverrides();
+  callUpdateFlow(key, { assignee });
   if(openModalMonth) showDetailModal(openModalMonth, openModalDay);
   if(currentViewMode==='assignee') renderAssigneeView();
   else renderCalendar();
@@ -1370,6 +1442,7 @@ loadCustomEvents();
 loadEventStatuses();
 loadAssigneeOverrides();
 loadDeadlines();
+loadFromSharePoint(); // SharePoint에서 최신 데이터 로드
 const nowMonth=new Date().getMonth()+1;
 if(nowMonth>=4&&nowMonth<=7){
   currentMonth=nowMonth;
