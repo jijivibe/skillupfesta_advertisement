@@ -653,35 +653,45 @@ async function loadFromSharePoint() {
       console.log('[SP] 첫 아이템 키 목록:', Object.keys(items[0]));
       console.log('[SP] 첫 아이템 데이터:', items[0]);
     }
+    // 첫 아이템 전체 필드/값 출력 (디버그)
+    if (items.length > 0) {
+      const fi = items[0];
+      Object.keys(fi).forEach(k => {
+        const v = fi[k];
+        if (v && typeof v !== 'object') console.log(`[SP필드] "${k}" = "${v}"`);
+      });
+    }
     let matchCount = 0;
     items.forEach(item => {
-      const dateStr = item['일정'] || item['Date'] || item['date'] || '';
-      if (!dateStr) { console.log('[SP] 날짜 없음:', item); return; }
+      // 날짜: OData_xc77c_xc815_ = 일정
+      const dateStr = item['OData_xc77c_xc815_'] || item['일정'] || '';
+      if (!dateStr) return;
       const d = new Date(dateStr);
-      if (isNaN(d)) { console.log('[SP] 날짜 파싱 실패:', dateStr); return; }
+      if (isNaN(d)) return;
       const month = d.getMonth() + 1;
       const day = d.getDate();
-      // 카테고리 필드 찾기
-      const catKey = Object.keys(item).find(k => k.includes('카테고리') && k.includes('Value'));
-      const category = catKey ? item[catKey] : (item['카테고리'] || '');
+      // 카테고리: 여러 이름 시도
+      const catKey = Object.keys(item).find(k =>
+        k.includes('xce74') || k.includes('카테고리') || k === 'OData_xcc44_xb110_'
+      );
+      const category = catKey ? item[catKey] : '';
       const title = (item['Title'] || '').substring(0, 30);
       const key = [month, day, category, title].join('||');
       const spId = item['ID'] || item['Id'] || item['id'];
-      // 진행상태 필드 찾기
-      const statusKey = Object.keys(item).find(k => k.includes('진행상태') && k.includes('Value'));
-      const status = statusKey ? item[statusKey] : (item['진행상태'] || '');
-      // 담당자 필드 찾기
-      const assigneeKey = Object.keys(item).find(k => k.includes('담당자') && k.includes('Value'));
-      const assignee = assigneeKey ? item[assigneeKey] : (item['담당자'] || '');
+      // 진행상태: OData_xc9c4_xd589_xc0c1_xd0dc_
+      const statusKey = Object.keys(item).find(k => k.includes('xc9c4') || k.includes('진행상태'));
+      const status = statusKey ? (item[statusKey] || '') : '';
+      // 담당자: pmd_xb2f4_xb2f9_xc790_
+      const assigneeKey = Object.keys(item).find(k => k.startsWith('pmd_') && k.includes('xb2f4') && !k.includes('Claims'));
+      const assignee = assigneeKey ? (item[assigneeKey] || '') : '';
       // 마감일
-      const deadlineRaw = item['마감일'] || '';
+      const deadlineRaw = item['마감일'] || item['OData_xb9c8_xac10_xc77c_'] || '';
       const deadline = deadlineRaw ? deadlineRaw.substring(0, 10) : '';
       spItemMap[key] = { id: spId, status, assignee, deadline };
       if (status || assignee || deadline) {
         matchCount++;
-        console.log('[SP] 키 매칭:', key, '→ status:', status, 'assignee:', assignee);
+        console.log('[SP] 매칭:', key, '→ status:', status, 'assignee:', assignee);
       }
-      // SP 데이터로 로컬 상태 덮어쓰기
       if (status) eventStatuses[key] = status;
       if (assignee) assigneeOverrides[key] = assignee;
       if (deadline) deadlines[key] = deadline;
