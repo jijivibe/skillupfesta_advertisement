@@ -642,38 +642,51 @@ function callUpdateFlow(key, updates) {
 
 async function loadFromSharePoint() {
   try {
+    console.log('[SP] READ 요청 시작...');
     const r = await fetch(READ_FLOW_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
-    if (!r.ok) return;
+    if (!r.ok) { console.warn('[SP] READ 실패 HTTP:', r.status); return; }
     const items = await r.json();
-    if (!Array.isArray(items)) return;
+    console.log('[SP] 응답 타입:', typeof items, Array.isArray(items));
+    if (!Array.isArray(items)) { console.warn('[SP] 배열 아님:', items); return; }
+    console.log('[SP] 아이템 수:', items.length);
+    if (items.length > 0) {
+      console.log('[SP] 첫 아이템 키 목록:', Object.keys(items[0]));
+      console.log('[SP] 첫 아이템 데이터:', items[0]);
+    }
+    let matchCount = 0;
     items.forEach(item => {
-      const dateStr = item['일정'] || '';
-      if (!dateStr) return;
+      const dateStr = item['일정'] || item['Date'] || item['date'] || '';
+      if (!dateStr) { console.log('[SP] 날짜 없음:', item); return; }
       const d = new Date(dateStr);
-      if (isNaN(d)) return;
+      if (isNaN(d)) { console.log('[SP] 날짜 파싱 실패:', dateStr); return; }
       const month = d.getMonth() + 1;
       const day = d.getDate();
       // 카테고리 필드 찾기
       const catKey = Object.keys(item).find(k => k.includes('카테고리') && k.includes('Value'));
-      const category = catKey ? item[catKey] : '';
+      const category = catKey ? item[catKey] : (item['카테고리'] || '');
       const title = (item['Title'] || '').substring(0, 30);
       const key = [month, day, category, title].join('||');
-      const spId = item['ID'] || item['Id'];
+      const spId = item['ID'] || item['Id'] || item['id'];
       // 진행상태 필드 찾기
       const statusKey = Object.keys(item).find(k => k.includes('진행상태') && k.includes('Value'));
-      const status = statusKey ? item[statusKey] : '';
+      const status = statusKey ? item[statusKey] : (item['진행상태'] || '');
       // 담당자 필드 찾기
       const assigneeKey = Object.keys(item).find(k => k.includes('담당자') && k.includes('Value'));
-      const assignee = assigneeKey ? item[assigneeKey] : '';
+      const assignee = assigneeKey ? item[assigneeKey] : (item['담당자'] || '');
       // 마감일
       const deadlineRaw = item['마감일'] || '';
       const deadline = deadlineRaw ? deadlineRaw.substring(0, 10) : '';
       spItemMap[key] = { id: spId, status, assignee, deadline };
+      if (status || assignee || deadline) {
+        matchCount++;
+        console.log('[SP] 키 매칭:', key, '→ status:', status, 'assignee:', assignee);
+      }
       // SP 데이터로 로컬 상태 덮어쓰기
       if (status) eventStatuses[key] = status;
       if (assignee) assigneeOverrides[key] = assignee;
       if (deadline) deadlines[key] = deadline;
     });
+    console.log('[SP] 상태/담당자 있는 아이템:', matchCount, '/ 전체:', items.length);
     saveEventStatuses();
     saveAssigneeOverrides();
     saveDeadlines();
@@ -681,7 +694,7 @@ async function loadFromSharePoint() {
     if (currentViewMode === 'assignee') renderAssigneeView();
     if (currentViewMode === 'todo') renderTodoTable();
   } catch(e) {
-    console.warn('SharePoint 로드 실패:', e);
+    console.warn('[SP] 로드 실패:', e);
   }
 }
 
@@ -1056,7 +1069,8 @@ function switchView(view) {
   document.querySelectorAll('.month-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('calendarView').style.display='none';
   document.getElementById('assigneeView').classList.remove('visible');
-  document.getElementById('todoView').classList.remove('visible');
+  const todoEl = document.getElementById('todoView');
+  if (todoEl) todoEl.classList.remove('visible');
 
   if(view === 'assignee') {
     document.querySelector('[data-view="assignee"]').classList.add('active');
