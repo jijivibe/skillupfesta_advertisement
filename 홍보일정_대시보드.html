@@ -622,8 +622,14 @@ const UPDATE_FLOW_URL = 'https://default9452cae0943443ed8edbdccd26f181.f0.enviro
 let spItemMap = {}; // eventKey → { id, status, assignee, deadline }
 
 function callUpdateFlow(key, updates) {
-  const sp = spItemMap[key];
-  if (!sp?.id) return;
+  let sp = spItemMap[key];
+  if (!sp?.id) {
+    // 카테고리 없는 부분 키로도 시도
+    const parts = key.split('||');
+    const pKey = [parts[0], parts[1], parts[3]].join('||');
+    sp = spItemMap[pKey];
+  }
+  if (!sp?.id) { console.warn('[SP] callUpdateFlow: 키 없음', key); return; }
   const payload = {
     id: sp.id,
     status: updates.status !== undefined ? updates.status : (sp.status || ''),
@@ -653,50 +659,43 @@ async function loadFromSharePoint() {
       console.log('[SP] 첫 아이템 키 목록:', Object.keys(items[0]));
       console.log('[SP] 첫 아이템 데이터:', items[0]);
     }
-    // 첫 아이템 전체 필드/값 출력 (디버그)
-    if (items.length > 0) {
-      const fi = items[0];
-      Object.keys(fi).forEach(k => {
-        const v = fi[k];
-        if (v && typeof v !== 'object') console.log(`[SP필드] "${k}" = "${v}"`);
-      });
-    }
-    let matchCount = 0;
+    // 카테고리 없이 월||일||제목(30자)으로 부분 매핑
+    const partialSpMap = {};
     items.forEach(item => {
-      // 날짜: OData_xc77c_xc815_ = 일정
       const dateStr = item['OData_xc77c_xc815_'] || item['일정'] || '';
       if (!dateStr) return;
       const d = new Date(dateStr);
       if (isNaN(d)) return;
       const month = d.getMonth() + 1;
       const day = d.getDate();
-      // 카테고리: 여러 이름 시도
-      const catKey = Object.keys(item).find(k =>
-        k.includes('xce74') || k.includes('카테고리') || k === 'OData_xcc44_xb110_'
-      );
-      const category = catKey ? item[catKey] : '';
       const title = (item['Title'] || '').substring(0, 30);
-      const key = [month, day, category, title].join('||');
+      const pKey = [month, day, title].join('||');
       const spId = item['ID'] || item['Id'] || item['id'];
-      // 진행상태: OData_xc9c4_xd589_xc0c1_xd0dc_
-      const statusKey = Object.keys(item).find(k => k.includes('xc9c4') || k.includes('진행상태'));
+      // 진행상태: #Id 제외, 텍스트 값만
+      const statusKey = Object.keys(item).find(k =>
+        (k.includes('xc9c4') || k.includes('진행상태')) && !k.includes('#Id') && !k.includes('#Claims')
+      );
       const status = statusKey ? (item[statusKey] || '') : '';
-      // 담당자: pmd_xb2f4_xb2f9_xc790_
-      const assigneeKey = Object.keys(item).find(k => k.startsWith('pmd_') && k.includes('xb2f4') && !k.includes('Claims'));
-      const assignee = assigneeKey ? (item[assigneeKey] || '') : '';
-      // 마감일
-      const deadlineRaw = item['마감일'] || item['OData_xb9c8_xac10_xc77c_'] || '';
+      // 마감일: OData_xb9c8_xac10_xc77c_ = 마감일
+      const deadlineRaw = item['OData_xb9c8_xac10_xc77c_'] || item['마감일'] || '';
       const deadline = deadlineRaw ? deadlineRaw.substring(0, 10) : '';
-      spItemMap[key] = { id: spId, status, assignee, deadline };
-      if (status || assignee || deadline) {
-        matchCount++;
-        console.log('[SP] 매칭:', key, '→ status:', status, 'assignee:', assignee);
-      }
-      if (status) eventStatuses[key] = status;
-      if (assignee) assigneeOverrides[key] = assignee;
-      if (deadline) deadlines[key] = deadline;
+      partialSpMap[pKey] = { id: spId, status, deadline };
     });
-    console.log('[SP] 상태/담당자 있는 아이템:', matchCount, '/ 전체:', items.length);
+    console.log('[SP] SP 매핑 완료:', Object.keys(partialSpMap).length, '건');
+
+    // BASE_EVENTS + customEvents와 매칭 (카테고리 없는 월||일||제목으로 찾기)
+    let matchCount = 0;
+    getAllEvents().forEach(e => {
+      const fullKey = getEventKey(e);
+      const pKey = [e.month, e.day, e.content.substring(0, 30)].join('||');
+      const sp = partialSpMap[pKey];
+      if (!sp) return;
+      matchCount++;
+      spItemMap[fullKey] = sp;
+      if (sp.status) eventStatuses[fullKey] = sp.status;
+      if (sp.deadline) deadlines[fullKey] = sp.deadline;
+    });
+    console.log('[SP] 이벤트 매칭:', matchCount, '건');
     saveEventStatuses();
     saveAssigneeOverrides();
     saveDeadlines();
